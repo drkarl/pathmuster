@@ -1,0 +1,21 @@
+[package]
+name = "pathmuster-cli"
+description = "Command-line interface for PathMuster."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "pathmuster"
+path = "src/main.rs"
+# The binary shares its name with the library crate, so documenting it would
+# collide with the library's docs; the CLI is thin and the library carries them.
+doc = false
+
+[dependencies]
+pathmuster = { path = "../pathmuster" }
+
+[lints]
+workspace = true

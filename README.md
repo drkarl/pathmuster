@@ -168,6 +168,30 @@ clippy with warnings denied, rustfmt, documented public items, `cargo deny` for
 dependency licences and advisories, and no panics on untrusted input, backed by
 property tests and fuzzing.
 
+## Development
+
+One script runs every gate CI runs, and fails on the first failing step:
+
+```console
+$ ./scripts/check.sh
+```
+
+The individual gates:
+
+| Gate | Command |
+|---|---|
+| Format | `cargo fmt --all --check` |
+| Lints | `cargo clippy --all-targets -- -D warnings` |
+| Tests | `cargo test --workspace` |
+| MSRV (1.85) | `cargo +1.85.0 test --workspace` |
+| Docs | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace` |
+| Dependencies | `cargo deny check` |
+
+`scripts/check.sh` needs `cargo-deny` 0.19 and the Rust 1.85 toolchain; install
+them with `cargo install cargo-deny --version 0.19.0 --locked` and
+`rustup toolchain install 1.85.0 --profile minimal`. The development toolchain
+itself is pinned in `rust-toolchain.toml`.
+
 ## Design
 
 The full proposed design, including the data model, finding codes, file

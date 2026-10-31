@@ -1,0 +1,4 @@
+* text=auto eol=lf
+# Fixtures and snapshots are compared byte-exactly, so EOL conversion is
+# disabled for them once they exist, e.g.:
+# tests/fixtures/** -text
