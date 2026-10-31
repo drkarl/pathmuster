@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Single quality gate: run locally and by CI. Fails on the first failing step.
+# Single local quality gate, mirroring the CI jobs. Fails on the first failing step.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
