@@ -163,10 +163,10 @@ A Rust library with a small public API and a separate command-line binary.
 - Output is **deterministic**: the same inputs give byte-identical reports and
   manifests.
 
-Planned engineering standards: stable Rust (MSRV 1.85), no `unsafe` code,
-clippy with warnings denied, rustfmt, documented public items, `cargo deny` for
-dependency licences and advisories, and no panics on untrusted input, backed by
-property tests and fuzzing.
+Engineering standards (stable Rust with MSRV 1.85, no `unsafe` code, clippy
+warnings denied, documented public items, no panics on untrusted input) are
+listed in [docs/architecture.md](docs/architecture.md) section 17; the gates
+that enforce them are below.
 
 ## Development
 
