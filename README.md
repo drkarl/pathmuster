@@ -6,9 +6,13 @@ render node without losing the files it depends on.**
 The crate and binary are named `pathmuster`. The name is not yet published on
 crates.io.
 
-> **Status: design stage.** There is no code yet. This repository contains the
-> proposed design for review. Every command, API and output shown below is a
-> proposal, not working software.
+> **Status: design approved, not implemented.** There is no code yet. This
+> repository contains the approved design. Every command, API and output shown
+> below is a proposed API, not working software.
+>
+> **Planned first release (0.1.0): USD text layers only.** Binary USD layers
+> (`.usdc`, `.usdz`) are not read, so an audit that reaches one ends as
+> incomplete (exit code 4), never as a pass.
 
 ## The problem
 
@@ -134,7 +138,7 @@ for finding in report.findings() {
 
 | Area | State |
 |---|---|
-| Architecture | Proposed, under review |
+| Architecture | Approved, not implemented |
 | Library and CLI | Not started |
 | USD adapter | Designed, not implemented |
 | Godot adapter | Outlined, not implemented |
@@ -168,4 +172,5 @@ property tests and fuzzing.
 
 The full proposed design, including the data model, finding codes, file
 formats, testing strategy and open questions, is in
-[docs/architecture.md](docs/architecture.md).
+[docs/architecture.md](docs/architecture.md). The implementation plan, with
+milestones, estimates and risks, is in [docs/roadmap.md](docs/roadmap.md).

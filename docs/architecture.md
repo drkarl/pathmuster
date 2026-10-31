@@ -1,8 +1,8 @@
 # PathMuster architecture
 
-Status: **proposed design, awaiting review.** No code exists yet. Every API, CLI
-command, finding code and file layout below is a proposal and may change during
-review or implementation.
+Status: **design approved, not implemented.** No code exists yet. Every API, CLI
+command, finding code and file layout below is a proposed API and may change
+during implementation.
 
 The crate and binary are named `pathmuster`; the JSON report schema identifier
 (`pathmuster-report`) uses the same name.

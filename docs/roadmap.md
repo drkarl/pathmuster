@@ -19,7 +19,7 @@ wins and this file should be corrected.
 10. [M6: Hardening and 0.1 release](#10-m6-hardening-and-01-release)
 11. [Risks](#11-risks)
 12. [Deferred work (not committed)](#12-deferred-work-not-committed)
-13. [Clarifications applied to the architecture](#13-clarifications-applied-to-the-architecture)
+13. [Clarifications adopted by the tasks](#13-clarifications-adopted-by-the-tasks)
 14. [Open decisions](#14-open-decisions)
 
 ---
@@ -437,7 +437,7 @@ and only for planning conversations.
 | Configuration file (`pathmuster.toml`) | Flags only until users ask | 8 to 12 |
 | Public adapter trait | Wait for two in-tree adapters | 10 to 16 |
 
-## 13. Clarifications applied to the architecture
+## 13. Clarifications adopted by the tasks
 
 The architecture leaves these details open. The tasks adopt the defaults below;
 none changes the design, and each should be confirmed or corrected when the
@@ -452,10 +452,10 @@ task is reviewed.
 | `manifestAssetPath` inside a `clips` dictionary | Recognised as a `ClipAsset` leaf, to be confirmed by the oracle job; anything else new in that dictionary stays a gap | T27 |
 | `.usd` file with a binary header | Detected by magic, treated like `.usdc` | T21 |
 
-## 14. Open decisions
+## 14. Decisions
 
-| Decision | Needed before | Recommendation |
+| Decision | Needed before | Status |
 |---|---|---|
-| Licence | The first public release (T35); better before any public push | Choose one early so `deny.toml` and the crate metadata can be set once |
-| Whether 0.1.0 should wait for binary USD support (R2) | End of M5 | Publish 0.1.0 as planned and say clearly that binary layers end an audit as `incomplete`; plan `.usdz` and `.usdc` next if early users have binary scenes |
-| Whether the oracle job (T32) blocks merges | T32 | Non-blocking until it has been stable for a few weeks |
+| Licence | The first public release (T35); better before any public push | **Open.** Choose one early so `deny.toml` and the crate metadata can be set once |
+| Whether 0.1.0 should wait for binary USD support (R2) | End of M5 | **Decided:** 0.1.0 ships text-only USD. Binary layers end an audit as `incomplete` (exit 4), and the README states this. `.usdz` and `.usdc` support is planned next if early users have binary scenes |
+| Whether the oracle job (T32) blocks merges | T32 | **Decided:** the oracle job does not block merges |
