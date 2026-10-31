@@ -8,9 +8,10 @@ lists and checksum manifests — and report which of them will break on the
 destination. The crate and binary are named `pathmuster`; the name is not yet
 published on crates.io.
 
-> **Status: scaffolding only.** The Cargo workspace, CI and quality gates are in
-> place, but no checking functionality is implemented yet. Every command, API
-> and output shown below is a proposed design, not working software.
+> **Status: scaffolding only.** The Cargo workspace, quality gates and CI
+> workflow definitions are in place, but no checking functionality is
+> implemented yet. Every command, API and output shown below is a proposed
+> design, not working software.
 >
 > **Planned first release (0.1.0): USD text layers only.** Binary USD layers
 > (`.usdc`, `.usdz`) are not read, so an audit that reaches one ends as
@@ -185,8 +186,10 @@ that enforce them are below.
   `serde_json`, `sha2`, `unicode-normalization`, `rayon` and `thiserror`.
   Planned test tools: `proptest`, `insta`, `assert_cmd`, `predicates` and
   `tempfile`.
-- The CI workflow is configured with jobs for formatting, clippy, tests on
-  Linux, macOS and Windows, the MSRV, documentation and `cargo deny`.
+- CI workflows are configured with jobs for formatting, clippy, tests on Linux,
+  macOS and Windows, the MSRV, documentation and `cargo deny`, plus a weekly
+  advisory check. They have not yet run on GitHub; the local gate below covers
+  the same checks.
 
 ## Build and run
 
