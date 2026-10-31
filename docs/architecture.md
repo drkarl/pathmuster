@@ -110,7 +110,8 @@ that mode.
 | F9 | Write the closure as a GNU `sha256sum` text manifest with paths relative to the root. |
 | F10 | Read path lists (newline or NUL separated), `sha256sum` files, BagIt `manifest-*.txt` files and OCFL `inventory.json` logical paths for standalone checking. |
 | F11 | Emit a human-readable report and a versioned JSON report; select pass/fail with a severity threshold and per-code overrides. |
-| F12 | Exit with documented codes distinguishing pass, policy failure, usage error and audit failure. |
+| F12 | Exit with documented codes distinguishing pass, policy failure, incomplete audit, usage error and audit failure. |
+| F13 | Fail closed on unsupported input. Every construct an adapter does not positively recognise is reported as a coverage-gap finding with its location, and an audit with any coverage gap has the result `incomplete`, never pass (section 9.1). |
 
 ### Non-functional
 
@@ -135,7 +136,7 @@ All signatures below are **proposed**.
 ### Library
 
 ```rust
-use pathmuster::{audit, AuditOptions, Target};
+use pathmuster::{audit, AuditOptions, Outcome, Policy, Target};
 
 // Audit a project entry file. The adapter is chosen from the file's content
 // and extension; the root bounds what counts as "inside the project".
@@ -146,6 +147,16 @@ let report = audit("shot/scene.usda", &options)?;
 
 for finding in report.findings() {
     eprintln!("{finding}");                        // file:line:col: severity[code]: message
+}
+
+// Incomplete means some input was not fully read (section 9.1).
+// It is never a pass, whatever the policy says.
+match report.outcome(&Policy::default()) {
+    Outcome::Pass => {}
+    Outcome::Fail => { /* findings at or above the threshold */ }
+    Outcome::Incomplete => {
+        for gap in report.coverage_gaps() { /* unsupported-construct, parse-error, ... */ }
+    }
 }
 
 let closure = report.closure();
@@ -187,6 +198,7 @@ Proposed top-level items (the whole intended public surface for 0.1):
 | `Reference`, `ReferenceKind`, `Target`, `Resolution` | types | See section 4 |
 | `Finding`, `FindingCode`, `Severity`, `Evidence` | types | See section 9 |
 | `Policy` | struct, builder | Severity overrides and fail threshold; decides pass or fail (section 9) |
+| `Outcome` | enum | `Pass`, `Fail`, `Incomplete`; the overall result (section 9.1) |
 | `Closure`, `ClosureEntry`, `IncompleteReason` | types | Closure and manifest writer |
 | `RelPath` | newtype | Validated root-relative path |
 | `rules::{RuleSet, PathCheck}` | module | Pure path rules |
@@ -216,9 +228,11 @@ pathmuster check-paths [FILE|-] [--input lines|nul|sha256sum|bagit|ocfl]
   containing `project.godot` for Godot.
 - `check` audits and reports. It never hashes.
 - `closure` audits, then writes the `sha256sum` manifest to `--output` or stdout
-  and the report to stderr. It fails (exit 1) when the closure is incomplete or
-  has external dependencies, unless the caller opts in with `--allow-incomplete`
-  or `--allow-external`.
+  and the report to stderr. It writes no manifest when the audit or the closure
+  is incomplete or the closure has external dependencies, unless the caller
+  opts in with `--allow-incomplete` or `--allow-external`. These flags only
+  permit writing a partial manifest; they never change the exit code of an
+  incomplete audit (4).
 - `check-paths` runs only the path rules. With no `--input`, the format is
   inferred from the file name (`manifest-*.txt` → BagIt, `inventory.json` → OCFL,
   `*.sha256`, `SHA256SUMS` → `sha256sum`) and otherwise defaults to `lines`.
@@ -227,10 +241,13 @@ Exit codes:
 
 | Code | Meaning |
 |---|---|
-| 0 | Audit completed; no finding at or above the fail threshold |
-| 1 | Audit completed; at least one finding at or above the threshold |
-| 2 | Usage error: bad flags, unknown finding code, unreadable option value |
+| 0 | Pass: complete audit; no finding at or above the fail threshold |
+| 1 | Fail: complete audit; at least one finding at or above the threshold |
+| 2 | Usage error: bad flags, unknown finding code, unreadable option value, or an attempt to remap a coverage-gap code |
 | 3 | Audit could not run: entry missing or unreadable, root invalid, unsupported entry format, output not writable |
+| 4 | Incomplete: the audit ran, but at least one coverage gap (section 9.1) means part of the input was not fully read. Never a pass. Takes precedence over 1; the report still lists every finding from the parts that were read |
+
+Precedence when several apply: 2, then 3, then 4, then 1, then 0.
 
 Examples (proposed):
 
@@ -241,6 +258,7 @@ shot/scene.usda:14:24: error[outside-root]: `../../shared/metal.png` resolves ou
 shot/layers/set.usda:8:30: error[case-mismatch]: `textures/Wall.png` matches `textures/wall.png` only case-insensitively (breaks on linux)
 shot/layers/set.usda:9:30: error[missing]: `textures/floor.png` does not exist
 closure: 3 layers, 4 assets, incomplete (1 missing)
+audit: complete (every construct in 3 layers recognised)
 4 errors, 0 warnings
 
 $ git ls-files -z | pathmuster check-paths --input nul --target windows -
@@ -311,6 +329,7 @@ pub struct Closure {
 | `Resolution::InsideRoot` | The path exists, is a regular file (after allowed symlinks), and matches on-disk names exactly or through a recorded `case-mismatch`/`normalization-mismatch` finding | Resolver |
 | `Closure.entries` | Sorted, unique, each a regular file inside the root, entry file included | Built from a `BTreeMap<RelPath, _>` |
 | `Closure` | `is_complete()` is true iff `incomplete` is empty; when false, the report has a `closure-incomplete` finding | Constructor |
+| `Report` | `outcome()` is `Incomplete` iff `coverage_gaps()` is non-empty, whatever the `Policy`; it is `Pass` only for a complete audit | `outcome` checks gaps before policy; `Policy` rejects gap codes |
 | `Report` | References ordered by (source file, byte offset); findings ordered by (subject, code) | Final sort before return |
 | `Report` | Contains no wall-clock time, host name or thread-dependent order | Review rule, determinism tests |
 
@@ -398,9 +417,10 @@ Lifecycle of one audit:
 3. **Traverse** with an explicit worklist (no recursion), a visited set keyed by
    `RelPath` (or canonical path for out-of-root layers, which are recorded but
    not traversed by default), and counters for every limit.
-4. **Extract, classify, resolve** each reference. Parse errors in a nested layer
-   become `parse-error` findings and mark the closure incomplete; the audit
-   continues.
+4. **Extract, classify, resolve** each reference. Parse errors and
+   unsupported constructs become located coverage-gap findings (section 9.1),
+   which make the audit incomplete; the audit continues with the rest of the
+   input.
 5. **Build the closure** from the entry and every `InsideRoot` target. Record
    `OutsideRoot` targets as external entries.
 6. **Run path rules** over the closure's paths and over the raw strings of
@@ -408,8 +428,9 @@ Lifecycle of one audit:
 7. **Assemble** the `Report`: sort, deduplicate findings, compute summary counts.
 8. **Hash** (only `closure`): stream each closure file through SHA-256 on a
    bounded thread pool, then write the manifest in sorted order.
-9. **Apply policy** in the CLI: map finding severities through overrides,
-   compare against `--fail-on`, choose the exit code.
+9. **Decide the outcome**: any coverage gap gives `Incomplete` (exit 4). Only
+   for a complete audit does the CLI map severities through overrides and
+   compare against `--fail-on` to choose `Pass` (0) or `Fail` (1).
 
 ---
 
@@ -497,7 +518,9 @@ and builds no scene graph.
     `templateAssetPath` string → `unexpanded-pattern`;
   - inside `assetInfo` or `customData` → `Metadata` (reported, not part of the
     closure);
-  - anything else → `Asset`, conservatively.
+  - an asset path in any other context → kept as `Asset` (so the closure
+    errs on the side of including it) **and** reported as
+    `unsupported-construct`, because its meaning is not known.
 - References inside `variantSet` blocks are extracted for every variant, with
   the variant named in `context`. The closure is the union across variants,
   because any variant may be selected at render time.
@@ -512,6 +535,22 @@ text layers (`.usda`, or `.usd` with a text header). Crate (`.usdc`, binary
 `.usd`) and package (`.usdz`) layers are included in the closure as files but not
 traversed, which adds an `untraversed-layer` reason to the closure. Other
 extensions (for example `.abc`, `.mtlx`, `.vdb`) are leaves.
+
+**Fail closed.** The reader never skips what it does not understand. Each of
+the following is a coverage gap with the file, line and column where it
+starts, and makes the audit `Incomplete` (section 9.1):
+
+- a `#usda` version other than `1.x`, or a missing header in a file read as a
+  text layer → `unsupported-construct`;
+- a token or syntax form the lexer does not recognise, including comment forms
+  not yet confirmed (Q8) → `unsupported-construct`;
+- an asset path in a context outside the list above → `unsupported-construct`;
+- an unterminated string, asset path or bracket → `parse-error`;
+- USD expressions → `expression`; `<UDIM>` and clip templates →
+  `unexpanded-pattern`; crate and package layers → `untraversed-layer`.
+
+The same rule binds every adapter: Godot input outside its supported subset is
+reported the same way.
 
 ### 7.5 Portability rules
 
@@ -639,20 +678,48 @@ Initial finding codes and default severities:
 | `control-character` | warning | component, code point |
 | `not-utf8` | error (Windows, macOS) | lossy display, raw bytes as hex |
 | `non-nfc-name` | info | component |
-| `uri-reference`, `environment-variable`, `expression`, `device-path` | warning | raw string |
-| `unexpanded-pattern` | warning | pattern |
+| `uri-reference`, `environment-variable`, `device-path` | warning | raw string |
+| `unsupported-construct` | error, gap | file, line, column, the construct, why it is outside the subset |
+| `expression` | error, gap | raw string |
+| `unexpanded-pattern` | error, gap | pattern |
 | `resolved-via-search-path` | warning | search path used |
 | `symlink` | warning | link and target |
 | `not-a-regular-file` | error | file type |
-| `parse-error`, `unreadable` | error | file, position or I/O error kind |
-| `untraversed-layer` | warning | layer, format |
+| `parse-error`, `unreadable` | error, gap | file, position or I/O error kind |
+| `untraversed-layer` | error, gap | layer, format |
 | `closure-incomplete` | error | reasons |
-| `limit-exceeded` | error | limit name and value |
+| `limit-exceeded` | error, gap | limit name and value |
 
 Policy (CLI): `--deny`, `--warn`, `--allow` remap a code's severity; `--fail-on`
 sets the threshold (default `error`). Remapping changes the reported severity,
 so JSON consumers see what the policy decided. The library exposes the same as
-`Policy` for embedding.
+`Policy` for embedding. Codes marked "gap" cannot be remapped: passing one to
+`--warn` or `--allow` is a usage error (exit 2).
+
+### 9.1 Audit completeness
+
+A **coverage gap** is any point where the audit could not fully read its
+input: `unsupported-construct`, `parse-error`, `unreadable`,
+`untraversed-layer`, `expression`, `unexpanded-pattern`, `limit-exceeded`. Each
+gap is a finding with its location. `Report::coverage_gaps()` lists them.
+
+The overall result is an `Outcome`:
+
+| Outcome | Exit | Condition |
+|---|---|---|
+| `Pass` | 0 | No coverage gap, and no finding at or above the fail threshold |
+| `Fail` | 1 | No coverage gap, and at least one finding at or above the threshold |
+| `Incomplete` | 4 | At least one coverage gap, whatever the other findings or the policy |
+
+A complete audit is a statement that every construct in every traversed file
+was recognised. An unsupported construct can therefore never produce `Pass`:
+the report says `incomplete` in the text summary
+(`audit: incomplete (2 gaps)`) and in the JSON `outcome` field, and the exit
+code is 4. `--fail-on never` affects only `Pass` versus `Fail`.
+
+This is separate from closure completeness. A missing file is a defect the
+audit found (`missing`, exit 1); the audit itself is complete. A gap means the
+audit cannot vouch for what it did not read.
 
 ---
 
@@ -810,7 +877,10 @@ trees between operating systems.
 Acceptance: on the core USD fixture, `pathmuster check` reports each planted
 defect with the correct code and location, the closure lists exactly the
 expected files, `sha256sum -c` accepts the generated manifest, and the results
-match on Linux, macOS and Windows CI runners.
+match on Linux, macOS and Windows CI runners. A second fixture containing
+constructs outside the supported subset produces located
+`unsupported-construct` findings, `audit: incomplete` and exit code 4, under
+every policy setting.
 
 Second slice, in order: Godot adapter; BagIt export of the closure (a new bag
 with `data/` payload, `manifest-sha256.txt`, `bagit.txt`, `bag-info.txt`
@@ -864,8 +934,8 @@ contradicts them.
 | Q5 | Follow in-root symlinks for resolution and closure? | **Follow, with a `symlink` warning.** `--no-follow-symlinks` makes them `not-a-regular-file` |
 | Q6 | Should `closure` fail when external (out-of-root) files exist? | **Fail (exit 1)** unless `--allow-external`; external files are listed in the report, never in the manifest |
 | Q7 | A case-mismatched reference: is its target part of the closure? | **Yes.** The file exists and must travel; the reference gets a `case-mismatch` error. The closure is complete for that file |
-| Q8 | Which comment forms does the `.usda` text grammar accept? | Match the OpenUSD text-format lexer and pin the behaviour with tests that the oracle job cross-checks. Until confirmed, accept `#` line comments and also skip `//` and `/* */` defensively, so an unexpected form cannot hide or invent a reference |
-| Q9 | `<UDIM>` in the first slice? | **Defer;** report `unexpanded-pattern` and mark the closure incomplete. Tile expansion (globbing `1001`–`1999`) is small and comes right after the first slice if early users need it |
+| Q8 | Which comment forms does the `.usda` text grammar accept? | Match the OpenUSD text-format lexer and pin the behaviour with tests that the oracle job cross-checks. Until confirmed, accept `#` line comments only; any other comment form is reported as `unsupported-construct`, so an unexpected form makes the audit incomplete instead of hiding or inventing a reference |
+| Q9 | `<UDIM>` in the first slice? | **Defer;** report `unexpanded-pattern`, a coverage gap, so the audit is `Incomplete` (exit 4) and the closure incomplete. Tile expansion (globbing `1001`–`1999`) is small and comes right after the first slice if early users need it |
 | Q10 | Unicode tables differ between Rust toolchains and crate versions. Record them? | **Yes:** the JSON report's `tool` section records the Unicode version used, so differences between runs are explainable |
 | Q11 | Godot `uid://` resolution when `.godot/` is absent (not committed)? | Build the map from `.uid` sidecars, `.import` files and resource headers. If a `uid://` cannot be mapped but the `path=` fallback resolves, report a warning, matching Godot's own fallback |
 | Q12 | Single crate with a `cli` feature, or library and CLI as separate packages? | **Separate packages** in one workspace, so library users never compile `clap` |

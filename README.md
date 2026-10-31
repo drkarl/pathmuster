@@ -58,6 +58,7 @@ shot/scene.usda:14:24: error[outside-root]: `../../shared/metal.png` resolves ou
 shot/layers/set.usda:8:30: error[case-mismatch]: `textures/Wall.png` matches `textures/wall.png` only case-insensitively (breaks on linux)
 shot/layers/set.usda:9:30: error[missing]: `textures/floor.png` does not exist
 closure: 3 layers, 4 assets, incomplete (1 missing)
+audit: complete (every construct in 3 layers recognised)
 4 errors, 0 warnings
 $ echo $?
 1
@@ -97,6 +98,10 @@ for finding in report.findings() {
 - **Reference extraction** from USD text layers (`.usda`): sublayers,
   references, payloads, asset-valued attributes, value clips and variants.
   Godot 4 text projects next.
+- **Fails closed on unsupported input**: anything in a scene file outside the
+  supported subset is reported with its location, and the audit is marked
+  incomplete (exit code 4). An audit that could not read everything is never
+  reported as clean.
 - **Resolution with evidence**: each reference is classified as resolved,
   missing, absolute, outside the project, Windows-only, case-mismatched or
   unresolvable (URIs, environment variables), with the file, line and column
@@ -110,7 +115,8 @@ for finding in report.findings() {
 - **Dependency closure** written as a `sha256sum` manifest, with a clear
   statement of whether it is complete. BagIt export is planned.
 - **Reports** as readable text or versioned JSON, with stable finding codes and
-  CI-friendly exit codes.
+  CI-friendly exit codes: 0 pass, 1 findings, 4 incomplete audit, 2 and 3 for
+  usage and runtime errors.
 
 ## Non-goals
 
