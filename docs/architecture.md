@@ -102,7 +102,7 @@ that mode.
 | F1 | Audit a USD text layer and the text layers it reaches through sublayers, references and payloads, against a declared project root. |
 | F2 | Extract asset paths from sublayers, references, payloads, `asset` and `asset[]` attribute values (default and time samples), value-clip `assetPaths`, and the same constructs inside variant sets. |
 | F3 | Resolve each reference against the filesystem with exact-name matching, independent of host case sensitivity and Unicode normalization. |
-| F4 | Classify each reference into exactly one target state and attach zero or more findings with evidence. |
+| F4 | Classify each reference into exactly one resolution and attach zero or more findings with evidence. |
 | F5 | Check every path in the closure, and every path given to `check-paths`, against the rules of each selected target platform. |
 | F6 | Detect set-level collisions: names that differ only by case or by Unicode normalization within the same directory, under each target's comparison rules. |
 | F7 | Compute the closure: the entry file plus every resolved in-root dependency, deduplicated and sorted, with external dependencies listed separately. |
@@ -184,8 +184,9 @@ Proposed top-level items (the whole intended public surface for 0.1):
 | `audit(entry, &AuditOptions) -> Result<Report, AuditError>` | fn | Run a project audit |
 | `AuditOptions` | struct, builder | Root, targets, search paths, limits, symlink policy |
 | `Report` | struct | References, findings, closure, summary; `Serialize` |
-| `Reference`, `ReferenceKind`, `Target`, `TargetState` | types | See section 4 |
+| `Reference`, `ReferenceKind`, `Target`, `Resolution` | types | See section 4 |
 | `Finding`, `FindingCode`, `Severity`, `Evidence` | types | See section 9 |
+| `Policy` | struct, builder | Severity overrides and fail threshold; decides pass or fail (section 9) |
 | `Closure`, `ClosureEntry`, `IncompleteReason` | types | Closure and manifest writer |
 | `RelPath` | newtype | Validated root-relative path |
 | `rules::{RuleSet, PathCheck}` | module | Pure path rules |
@@ -263,7 +264,7 @@ pub struct Reference {
     pub kind: ReferenceKind,        // Sublayer, Reference, Payload, Asset, ClipAsset, ...
     pub raw: String,                // exactly as written, unescaped by the format's rules
     pub syntax: PathSyntax,         // lexical class of `raw`
-    pub state: TargetState,
+    pub resolution: Resolution,     // what resolving `raw` found on disk
     pub context: Option<String>,    // e.g. "variantSet modelingVariant = \"High\""
 }
 
@@ -282,7 +283,7 @@ pub enum PathSyntax {
     Empty,
 }
 
-pub enum TargetState {
+pub enum Resolution {
     InsideRoot { path: RelPath },                 // resolved and inside the root
     OutsideRoot { path: std::path::PathBuf },     // resolved, but not under the root
     Missing { tried: Vec<std::path::PathBuf> },   // well-formed, nothing on disk
@@ -305,9 +306,9 @@ pub struct Closure {
 |---|---|---|
 | `RelPath` | UTF-8; `/` separators only; no leading `/`; no empty, `.` or `..` components; no NUL. Non-empty. | Private field; only constructor validates |
 | `RelPath` | Byte-wise ordering is the canonical sort order | `Ord` derives from the string |
-| `Reference` | Exactly one `TargetState` | Enum |
+| `Reference` | Exactly one `Resolution` | Enum |
 | `Reference` | `source.file` is a traversed layer inside the root | Constructed by the traversal only |
-| `TargetState::InsideRoot` | The path exists, is a regular file (after allowed symlinks), and matches on-disk names exactly or through a recorded `case-mismatch`/`normalization-mismatch` finding | Resolver |
+| `Resolution::InsideRoot` | The path exists, is a regular file (after allowed symlinks), and matches on-disk names exactly or through a recorded `case-mismatch`/`normalization-mismatch` finding | Resolver |
 | `Closure.entries` | Sorted, unique, each a regular file inside the root, entry file included | Built from a `BTreeMap<RelPath, _>` |
 | `Closure` | `is_complete()` is true iff `incomplete` is empty; when false, the report has a `closure-incomplete` finding | Constructor |
 | `Report` | References ordered by (source file, byte offset); findings ordered by (subject, code) | Final sort before return |
@@ -825,12 +826,9 @@ job and fuzzing in CI.
 - `.usdc` crate parsing and `.usdz` package inspection (package-relative paths).
 - UDIM tile expansion, value-clip templates, USD expression evaluation.
 - Dependencies inside non-USD leaves (MaterialX documents, OSL shaders).
-- A LaTeX `.fls` adapter (well-defined input, clear relative-path rules) after
-  Godot.
 - OCFL content paths and all versions; Godot `export_presets.cfg` filters.
 - Non-mutating relink suggestions ("`Wall.png` → `wall.png`"); later, perhaps, an
   opt-in rewrite to relative paths with a dry run.
-- Manifest comparison between two closures.
 - A configuration file (`pathmuster.toml`) for policy; flags only until users ask.
 - A public adapter trait.
 
