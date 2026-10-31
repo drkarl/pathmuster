@@ -1,0 +1,12 @@
+# Build output
+/target/
+
+# Rustfmt backups
+**/*.rs.bk
+
+# Debug symbols (Windows MSVC)
+*.pdb
+
+# Editor and OS files
+.DS_Store
+*.swp
