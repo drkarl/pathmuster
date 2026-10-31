@@ -3,12 +3,14 @@
 **Check whether a project can move to another computer, operating system or
 render node without losing the files it depends on.**
 
-The crate and binary are named `pathmuster`. The name is not yet published on
-crates.io.
+PathMuster will audit the references inside a project — USD layers, plain path
+lists and checksum manifests — and report which of them will break on the
+destination. The crate and binary are named `pathmuster`; the name is not yet
+published on crates.io.
 
-> **Status: design approved, not implemented.** There is no code yet. This
-> repository contains the approved design. Every command, API and output shown
-> below is a proposed API, not working software.
+> **Status: scaffolding only.** The Cargo workspace, CI and quality gates are in
+> place, but no checking functionality is implemented yet. Every command, API
+> and output shown below is a proposed design, not working software.
 >
 > **Planned first release (0.1.0): USD text layers only.** Binary USD layers
 > (`.usdc`, `.usdz`) are not read, so an audit that reaches one ends as
@@ -37,7 +39,10 @@ machine from the one where the mistake was made. Existing tools either need
 the full authoring application installed or report which paths resolve today
 without saying why a resolved path will not survive a move.
 
-## Who it is for
+## Intended users
+
+These are the people the design targets; none of the checks described here work
+yet.
 
 - **Artists and technical directors** who hand USD scenes to a render farm or a
   collaborator and want a pre-submit check.
@@ -168,9 +173,36 @@ warnings denied, documented public items, no panics on untrusted input) are
 listed in [docs/architecture.md](docs/architecture.md) section 17; the gates
 that enforce them are below.
 
+## Technology
+
+- Rust, edition 2024, minimum supported Rust version 1.85.
+- One Cargo workspace with two packages: the `pathmuster` library and
+  `pathmuster-cli`, whose binary is named `pathmuster`, so library users never
+  compile the CLI dependencies.
+- Both crates forbid `unsafe` code. The library documents every public item and
+  denies `unwrap`, `expect` and slice indexing in non-test code.
+- Planned dependencies, none of them used yet: `clap` (CLI only), `serde` and
+  `serde_json`, `sha2`, `unicode-normalization`, `rayon` and `thiserror`.
+  Planned test tools: `proptest`, `insta`, `assert_cmd`, `predicates` and
+  `tempfile`.
+- The CI workflow is configured with jobs for formatting, clippy, tests on
+  Linux, macOS and Windows, the MSRV, documentation and `cargo deny`.
+
+## Build and run
+
+No checking functionality is implemented yet: the workspace builds and tests,
+and the binary prints its version and exits.
+
+```console
+$ cargo build --workspace
+$ cargo test --workspace
+$ cargo run -p pathmuster-cli
+pathmuster 0.0.0
+```
+
 ## Development
 
-One script runs every gate CI runs, and fails on the first failing step:
+One script runs every gate, and fails on the first failing step:
 
 ```console
 $ ./scripts/check.sh
