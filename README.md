@@ -143,7 +143,7 @@ for finding in report.findings() {
 | USD adapter | Designed, not implemented |
 | Godot adapter | Outlined, not implemented |
 | Releases | None. Not published on crates.io |
-| Licence | Not yet chosen |
+| Licence | MIT OR Apache-2.0 |
 
 ## Technical overview
 
@@ -174,3 +174,18 @@ The full proposed design, including the data model, finding codes, file
 formats, testing strategy and open questions, is in
 [docs/architecture.md](docs/architecture.md). The implementation plan, with
 milestones, estimates and risks, is in [docs/roadmap.md](docs/roadmap.md).
+
+## License
+
+Licensed under either of
+
+- [Apache License, Version 2.0](LICENSE-APACHE)
+- [MIT license](LICENSE-MIT)
+
+at your option.
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this work by you, as defined in the Apache-2.0 license, shall
+be dual licensed as above, without any additional terms or conditions.

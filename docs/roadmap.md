@@ -393,7 +393,7 @@ version is in the report; the release records it).
   references finishing well under a second on a local disk, excluding hashing
   (N7). Every limit in architecture section 10 has a test showing the
   `limit-exceeded` gap.
-- Release checklist: licence chosen and present, `Cargo.toml` metadata, changelog,
+- Release checklist: licence files present and `license = "MIT OR Apache-2.0"` in both `Cargo.toml` files, package metadata, changelog,
   `cargo publish --dry-run` for both packages, `cargo deny` clean, README
   maturity table updated, and `cargo semver-checks` baseline recorded.
 
@@ -456,6 +456,6 @@ task is reviewed.
 
 | Decision | Needed before | Status |
 |---|---|---|
-| Licence | The first public release (T35); better before any public push | **Open.** Choose one early so `deny.toml` and the crate metadata can be set once |
+| Licence | The first public release (T35) | **Decided:** MIT OR Apache-2.0. `LICENSE-MIT` and `LICENSE-APACHE` are in the repository; `license = "MIT OR Apache-2.0"` is set in every `Cargo.toml` from T01 |
 | Whether 0.1.0 should wait for binary USD support (R2) | End of M5 | **Decided:** 0.1.0 ships text-only USD. Binary layers end an audit as `incomplete` (exit 4), and the README states this. `.usdz` and `.usdc` support is planned next if early users have binary scenes |
 | Whether the oracle job (T32) blocks merges | T32 | **Decided:** the oracle job does not block merges |
